@@ -125,3 +125,105 @@ var Greeter_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "orders/v1/orders.proto",
 }
+
+const (
+	Orders_CreateOrder_FullMethodName = "/helloworld.Orders/CreateOrder"
+)
+
+// OrdersClient is the client API for Orders service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type OrdersClient interface {
+	CreateOrder(ctx context.Context, in *CreateOrderRequest, opts ...grpc.CallOption) (*CreateOrderReply, error)
+}
+
+type ordersClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewOrdersClient(cc grpc.ClientConnInterface) OrdersClient {
+	return &ordersClient{cc}
+}
+
+func (c *ordersClient) CreateOrder(ctx context.Context, in *CreateOrderRequest, opts ...grpc.CallOption) (*CreateOrderReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateOrderReply)
+	err := c.cc.Invoke(ctx, Orders_CreateOrder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// OrdersServer is the server API for Orders service.
+// All implementations must embed UnimplementedOrdersServer
+// for forward compatibility.
+type OrdersServer interface {
+	CreateOrder(context.Context, *CreateOrderRequest) (*CreateOrderReply, error)
+	mustEmbedUnimplementedOrdersServer()
+}
+
+// UnimplementedOrdersServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedOrdersServer struct{}
+
+func (UnimplementedOrdersServer) CreateOrder(context.Context, *CreateOrderRequest) (*CreateOrderReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateOrder not implemented")
+}
+func (UnimplementedOrdersServer) mustEmbedUnimplementedOrdersServer() {}
+func (UnimplementedOrdersServer) testEmbeddedByValue()                {}
+
+// UnsafeOrdersServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to OrdersServer will
+// result in compilation errors.
+type UnsafeOrdersServer interface {
+	mustEmbedUnimplementedOrdersServer()
+}
+
+func RegisterOrdersServer(s grpc.ServiceRegistrar, srv OrdersServer) {
+	// If the following call panics, it indicates UnimplementedOrdersServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&Orders_ServiceDesc, srv)
+}
+
+func _Orders_CreateOrder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateOrderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrdersServer).CreateOrder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Orders_CreateOrder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrdersServer).CreateOrder(ctx, req.(*CreateOrderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// Orders_ServiceDesc is the grpc.ServiceDesc for Orders service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var Orders_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "helloworld.Orders",
+	HandlerType: (*OrdersServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CreateOrder",
+			Handler:    _Orders_CreateOrder_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "orders/v1/orders.proto",
+}

@@ -14,6 +14,8 @@ import (
 
 const (
 	defaultName = "world"
+	product     = "apples"
+	quantity    = 10
 )
 
 var (
@@ -31,6 +33,7 @@ func main() {
 	defer conn.Close()
 
 	c := pb.NewGreeterClient(conn)
+	orders := pb.NewOrdersClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -40,5 +43,11 @@ func main() {
 		log.Fatalf("could not greet: %v", err)
 	}
 	log.Printf("Greetings: %s", r.GetMessage())
+
+	o, err := orders.CreateOrder(ctx, &pb.CreateOrderRequest{ProductName: product, Quantity: quantity})
+	if err != nil {
+		log.Fatalf("could not create order: %v", err)
+	}
+	log.Printf("Greetings: %s", o.GetOrderID())
 
 }

@@ -11,6 +11,10 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	DB_URL = "postgres://postgres:postgres@localhost:5432/postgres"
+)
+
 var (
 	port = flag.Int("port", 50051, "The server port")
 )
@@ -31,6 +35,15 @@ func (s *server) SayHello(_ context.Context, in *pb.HelloRequest) (*pb.HelloRepl
 	return &pb.HelloReply{Message: "Hello " + in.GetName()}, nil
 }
 
+type orders struct {
+	pb.UnimplementedOrdersServer
+}
+
+func (s *orders) CreateOrder(_ context.Context, in *pb.CreateOrderRequest) (*pb.CreateOrderReply, error) {
+	log.Printf("Received order for %v of type %v", in.GetQuantity(), in.GetProductName())
+	return &pb.CreateOrderReply{OrderID: "test-id"}, nil
+}
+
 func main() {
 	flag.Parse()
 
@@ -42,6 +55,7 @@ func main() {
 	s := grpc.NewServer()
 
 	pb.RegisterGreeterServer(s, &server{})
+	pb.RegisterOrdersServer(s, &orders{})
 	log.Printf("server listening at %v", lis.Addr())
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
