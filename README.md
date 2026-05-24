@@ -7,8 +7,7 @@
 - add security (TLS and auth) (By default, gRPC expects production-grade TLS (SSL encryption) to protect the binary stream. Because you are testing this locally on your own machine, this flag explicitly tells the client: "It's okay, turn off TLS validation for this connection.")
 - Add proper orders, suppor controller + service + repository in posgres
 - POC and introduce Kafka
-
-
+- add otel tracing and link traces to logs
 
 
 
@@ -63,3 +62,13 @@ grpc-kafka-poc/
 │           └── v1/
 └── docker-compose.yaml                # Spins up Kafka & Zookeeper locally with 1 command
 ```
+
+
+### 📝 Logging Architecture
+
+* **Structured Logging:** Uses Go's native `log/slog` engine, ensuring logs are emitted as key-value pairs rather than unstructured plain text.
+* **Environment-Aware Formatting:** 
+  * **Production:** Automatically outputs optimized, machine-readable **JSON** format for seamless indexing by log aggregators (Elasticsearch, Datadog, AWS CloudWatch).
+  * **Local Development:** Dynamically switches to a human-readable **Console/Text** format powered by `github.com/lmittmann/tint` for colorized, easy-to-read terminal logs.
+* **Contextual Tracing Ready:** Employs context-aware logging functions (`slog.InfoContext`, `slog.ErrorContext`) across internal packages to pave the way for distributed request tracing (`trace_id` injection).
+* **Zero Boilerplate Injection:** Configured globally at application startup within `main.go`, keeping internal business packages decoupled from verbose dependency injection.

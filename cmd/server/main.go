@@ -5,14 +5,20 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
+	"github.com/konkerama/go-grpc-api/internal/db"
+
+	"github.com/konkerama/go-grpc-api/internal/orders"
 	pb "github.com/konkerama/go-grpc-api/pkg/pb/orders/v1"
+	"github.com/lmittmann/tint"
 	"google.golang.org/grpc"
-)
-
-const (
-	DB_URL = "postgres://postgres:postgres@localhost:5432/postgres"
+	"google.golang.org/grpc/reflection"
 )
 
 var (
@@ -35,30 +41,77 @@ func (s *server) SayHello(_ context.Context, in *pb.HelloRequest) (*pb.HelloRepl
 	return &pb.HelloReply{Message: "Hello " + in.GetName()}, nil
 }
 
-type orders struct {
-	pb.UnimplementedOrdersServer
-}
+// type orders struct {
+// 	pb.UnimplementedOrdersServer
+// }
+//
+// func (s *orders) CreateOrder(_ context.Context, in *pb.CreateOrderRequest) (*pb.CreateOrderReply, error) {
+// 	log.Printf("Received order for %v of type %v", in.GetQuantity(), in.GetProductName())
+// 	return &pb.CreateOrderReply{OrderID: "test-id"}, nil
+// }
 
-func (s *orders) CreateOrder(_ context.Context, in *pb.CreateOrderRequest) (*pb.CreateOrderReply, error) {
-	log.Printf("Received order for %v of type %v", in.GetQuantity(), in.GetProductName())
-	return &pb.CreateOrderReply{OrderID: "test-id"}, nil
-}
+type Closer func(context.Context) error
 
 func main() {
 	flag.Parse()
 
+	var handler slog.Handler
+
+	if os.Getenv("APP_ENV") == "production" {
+		// Production stays structured JSON
+		handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelInfo,
+		})
+	} else {
+		// Local dev gets nice terminal colors via tint
+		handler = tint.NewHandler(os.Stderr, &tint.Options{
+			Level:      slog.LevelInfo,
+			TimeFormat: time.Kitchen, // "3:04PM" or use "15:04:05" for 24h
+			AddSource:  true,         // Keeps your file source lines, but tidier
+		})
+	}
+
+	logger := slog.New(handler)
+	slog.SetDefault(logger)
+
+	// init db
+
+	dbConfig := db.NewDBConfig()
+
+	if err := db.RunMigrations(dbConfig.PGPool); err != nil {
+		slog.Error("failed to run database migrations", "error", err)
+	}
+
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		slog.Error("failed to listen", "error", err)
 	}
+
+	ordersModule := orders.Wire(dbConfig.PGPool)
+	logger.Info("orders module dependencies wired successfully")
 
 	s := grpc.NewServer()
 
 	pb.RegisterGreeterServer(s, &server{})
-	pb.RegisterOrdersServer(s, &orders{})
-	log.Printf("server listening at %v", lis.Addr())
+
+	pb.RegisterOrdersServer(s, ordersModule.Controller)
+
+	// gRPC Reflection is a built-in extension to the gRPC protocol that allows a server to describe its own API schema to anyone who asks.
+	reflection.Register(s)
+
+	slog.Info("server listening", "addr", lis.Addr())
 	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+		slog.Error("failed to serve", "error", err)
 	}
+
+	// Block until we receive an OS signal to terminate
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	<-stop
+
+	logger.Info("shutting down gRPC server gracefully...")
+	s.GracefulStop()
+	logger.Info("application exited cleanly")
 
 }

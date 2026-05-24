@@ -11,3 +11,18 @@ run-server:
 
 run-client:
 	go run ./cmd/client/.
+
+docker-deps:
+	docker compose up
+
+grpcui:
+	grpcui -plaintext localhost:50051
+
+grpcurl-list:
+	grpcurl -plaintext localhost:50051 list
+
+grpcurl-create-order:
+	grpcurl -plaintext \
+		-d '{"productName": "apples", "quantity": 5}' \
+		localhost:50051 \
+		helloworld.Orders.CreateOrder
